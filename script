@@ -1,0 +1,4 @@
+SUPER_ADMIN_EMAIL=superadmin@vidya.ai
+SUPER_ADMIN_PASSWORD=<strong-random-password>
+PLATFORM_ADMIN_EMAIL=admin@vidya.ai
+PLATFORM_ADMIN_PASSWORD=<strong-random-password>

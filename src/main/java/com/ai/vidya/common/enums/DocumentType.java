@@ -1,0 +1,15 @@
+package com.ai.vidya.common.enums;
+
+public enum DocumentType {
+    AFFILIATION_CERTIFICATE,
+    UDISE_LETTER,
+    REGISTRATION_CERTIFICATE,
+    GOVERNMENT_NOC,
+    TRUST_DEED,
+    PAN_CARD,
+    GST_CERTIFICATE,
+    LOGO,
+    SCHOOL_BUILDING_PHOTO,
+    RECOGNITION_ORDER,
+    OTHER
+}

@@ -1,0 +1,139 @@
+spring:
+  application:
+    name: Vidya-OS
+
+# ── Database ────────────────────────────────────────────────────────────
+  datasource:
+    url: jdbc:postgresql://localhost:5432/vidyaos
+    username: postgres
+    password: 0001
+    hikari:
+      pool-name: VidyaOS-Pool
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      connection-test-query: SELECT 1
+
+  jpa:
+    hibernate:
+      ddl-auto: validate          # Flyway owns the schema
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc.batch_size: 50
+        order_inserts: true
+        order_updates: true
+        format_sql: false
+        default_schema: public
+    open-in-view: false           # CRITICAL — no lazy-loading outside transaction
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    out-of-order: false
+
+  # ── Cache ───────────────────────────────────────────────────────────────
+  # L1  = Caffeine (in-process, millisecond latency)
+  # L2  = Redis    (distributed, shared across pods)
+  # Switch: spring.cache.type=redis  →  all @Cacheable annotations use Redis.
+  #         spring.cache.type=caffeine → all use Caffeine (single-node / local dev).
+  cache:
+    type: caffeine                # Change to "redis" in production / multi-node
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=10m
+
+  # Redis config (used when spring.cache.type=redis)
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+        shutdown-timeout: 100ms
+
+  jackson:
+    default-property-inclusion: non_null
+    # Jackson 3.x (shipped with Spring Boot 4.x) moved to the tools.jackson package
+    # and removed WRITE_DATES_AS_TIMESTAMPS from SerializationFeature.
+    # Date/time serialization format is now controlled through the mapper builder:
+    #   - disable-features replaces serialization.WRITE_DATES_AS_TIMESTAMPS: false
+    #   - Jackson 3 writes dates as ISO-8601 strings by default when this is disabled
+#    mapper:
+      # Write LocalDate / LocalDateTime / ZonedDateTime as ISO-8601 strings
+      # e.g. "2024-04-01T08:00:00" instead of a numeric timestamp array
+#      disable-features: WRITE_DATES_AS_TIMESTAMPS
+    deserialization:
+      FAIL_ON_UNKNOWN_PROPERTIES: false
+
+# ── JWT ─────────────────────────────────────────────────────────────────
+app:
+  jwt:
+    secret: ${JWT_SECRET:c2VjcmV0LWtleS1mb3ItYWktdmlkeWEtc3RhZmYtbWdtdC0yMDI1}
+    expiration-ms: 86400000        # 24 h
+    refresh-expiration-ms: 604800000  # 7 d
+
+  # Tenant header names (also read from JWT claims)
+  tenant:
+    header: X-Tenant-Id
+#    school-header: X-School-Id
+
+  # ── Cache TTL fine-tuning (Caffeine / Redis) ─────────────────────────
+  cache:
+    staff-list-ttl-minutes: 5
+    staff-detail-ttl-minutes: 10
+    performance-ttl-minutes: 15
+    ai-insights-ttl-minutes: 30   # AI results are expensive – cache longer
+    permissions-ttl-minutes: 60   # Permissions rarely change
+    top-performers-ttl-minutes: 30
+
+
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:5173}
+
+  # ── Platform team admin accounts ─────────────────────────────────────────
+  # These users are created on startup by PlatformAdminSeeder (idempotent).
+  # Credentials MUST come from environment variables in production.
+  # SUPER_ADMIN   = break-glass, founders / CTO only
+  # PLATFORM_ADMIN = daily driver for ops/support engineers
+  platform-admins:
+    - email:     ${SUPER_ADMIN_EMAIL:superadmin@vidya.ai}
+      password:  ${SUPER_ADMIN_PASSWORD:SuperAdmin@12345}   # OVERRIDE IN PRODUCTION
+      full-name: ${SUPER_ADMIN_NAME:Super Admin}
+      role:      SUPER_ADMIN
+
+    - email:     ${PLATFORM_ADMIN_EMAIL:admin@vidya.ai}
+      password:  ${PLATFORM_ADMIN_PASSWORD:PlatformAdmin@12345}  # OVERRIDE IN PRODUCTION
+      full-name: ${PLATFORM_ADMIN_NAME:Platform Admin}
+      role:      PLATFORM_ADMIN
+
+# ── Actuator ─────────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,caches
+  endpoint:
+    health:
+      show-details: when-authorized
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+# ── Logging ──────────────────────────────────────────────────────────────
+logging:
+  level:
+    com.ai.vidya: DEBUG
+    org.springframework.cache: TRACE   # Helpful to verify cache hits/misses
+    org.springframework.security: INFO
+    org.hibernate.SQL: DEBUG
